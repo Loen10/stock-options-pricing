@@ -1,0 +1,104 @@
+package main
+
+import (
+	"fmt"
+	"math"
+)
+
+type BlackScholesMerton struct {
+	underlyingPrice,
+	strikePrice,
+	volatility,
+	riskFreeInterestRate,
+	dividendYield,
+	yearsToExpiration float64
+}
+
+func (b BlackScholesMerton) callPrice() float64 {
+	d1 := (math.Log(b.underlyingPrice/b.strikePrice) + b.yearsToExpiration*
+		(b.riskFreeInterestRate-
+			b.dividendYield+b.volatility*b.volatility/2)) /
+		(b.volatility * math.Sqrt(b.yearsToExpiration))
+
+	d2 := d1 - b.volatility*math.Sqrt(b.yearsToExpiration)
+	return b.underlyingPrice*
+		math.Exp(-b.dividendYield*b.yearsToExpiration)*phi(d1) -
+		b.strikePrice*math.Exp(-b.riskFreeInterestRate*b.yearsToExpiration)*
+			phi(d2)
+}
+
+func (b *BlackScholesMerton) findRiskFreeInterestRate(callPrice float64) error {
+	type Bound struct {
+		val float64
+		set bool
+	}
+
+	var low, high Bound
+
+	for {
+		diff := callPrice - b.callPrice()
+
+		if diff > 0.0005 {
+			low = Bound{val: b.riskFreeInterestRate, set: true}
+
+			if high == 0 {
+				b.riskFreeInterestRate *= 2
+			}
+		} else if diff < -0.0005 {
+			high = b.riskFreeInterestRate
+			b.riskFreeInterestRate = (low + high) / 2
+		} else {
+			return nil
+		}
+
+	}
+	// high := .2
+	// low := 0.
+
+	// for i := 0; i < 100; i++ {
+	// 	diff := callPrice - b.callPrice()
+
+	// 	if diff > 0.0005 {
+	// 		low = b.riskFreeInterestRate
+	// 	} else if diff < -0.0005 {
+	// 		high = b.riskFreeInterestRate
+	// 	} else {
+	// 		return nil
+	// 	}
+
+	// 	b.riskFreeInterestRate = (low + high) / 2
+	// }
+
+	// return errors.New("iterations limit reached")
+}
+
+func main() {
+	fmt.Println("STOCK OPTIONS")
+	var b BlackScholesMerton
+
+	read(&b.underlyingPrice, "Underlying price: ")
+	read(&b.strikePrice, "Strike price: ")
+	read(&b.volatility, "Volatility: ")
+	read(&b.riskFreeInterestRate, "Risk-free interest rate: ")
+	read(&b.dividendYield, "Dividend yield: ")
+	read(&b.yearsToExpiration, "Days to expiration: ")
+	b.yearsToExpiration /= 365
+	fmt.Println(b.callPrice())
+
+	err := b.findRiskFreeInterestRate(0.15)
+	if err == nil {
+		fmt.Printf("Risk-free interest rate: %.2f%%\n", b.riskFreeInterestRate*100)
+	} else {
+		fmt.Println(err.Error())
+	}
+}
+
+func read(x any, label string) error {
+	fmt.Print(label)
+	_, err := fmt.Scan(x)
+	return err
+}
+
+func phi(x float64) float64 {
+	return 0.5 * (1 + math.Erf(x/math.Sqrt2))
+}
