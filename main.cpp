@@ -7,5 +7,6 @@ using namespace std;
 int main() {
     cout << "STOCK OPTIONS PRICING" << endl;
     BlackScholesMerton b;
-    cout << b.call_price() << endl;
+    cout << "Theoretical Call Price: $" << b.call_price() << endl;
+    cout << "Theoretical Put Price: $" << b.put_price() << endl;
 }

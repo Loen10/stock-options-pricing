@@ -68,14 +68,19 @@ BlackScholesMerton::BlackScholesMerton() {
     r = read_double("Risk-free interest rate %: ") / 100;
     q = read_double("Dividend yield %: ") / 100;
     tm expdate = read_date("Expiration date (mm/dd/yyyy): ");
+    const double days = (mktime(&expdate) - time(nullptr)) / (double)86400;
+    cout << "Days: " << days << endl;
     t = (mktime(&expdate) - time(nullptr)) * years_per_second;
 }
 
 double BlackScholesMerton::call_price() const {
-    double v_times_sqrt_t = v * sqrt(t);
-    double d1 = (log(S / K) + t * (r - q + v * v * 0.5)) / v_times_sqrt_t;
-    double d2 = d1 - v_times_sqrt_t;
-    return S * exp(-q * t) * phi(d1) - K * exp(-r * t) * phi(d2);
+    const D1D2 d = calc_d1d2();
+    return S * exp(-q * t) * phi(d.d1) - K * exp(-r * t) * phi(d.d2);
+}
+
+double BlackScholesMerton::put_price() const {
+    const D1D2 d = calc_d1d2();
+    return K * exp(-r * t) * phi(-d.d2) - S * exp(-q * t) * phi(-d.d1);
 }
 
 ostream& operator<<(ostream& out, const BlackScholesMerton& b) {
@@ -89,3 +94,10 @@ ostream& operator<<(ostream& out, const BlackScholesMerton& b) {
     return out;
 }
 
+BlackScholesMerton::D1D2 BlackScholesMerton::calc_d1d2() const {
+    const double v_times_sqrt_t = v * sqrt(t);
+    D1D2 res;
+    res.d1 = (log(S / K) + t * (r - q + v * v * 0.5)) / v_times_sqrt_t;
+    res.d2 = res.d1 - v_times_sqrt_t;
+    return res;
+}
