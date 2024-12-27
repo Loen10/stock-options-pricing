@@ -2,6 +2,20 @@
 #include <cmath>
 #include <ctime>
 
+
+// 0x3FD9884533D43651
+constexpr double invsqrt2 = 0.70710678118654752440084436210485;
+constexpr double invsqrt2pi = 0.39894228040143267793994605993438;
+constexpr double years_per_day = 0.00273972602739726027397260273973;
+
+constexpr double sncdf(const double x) {
+    return 0.5 * (1 + erf(x * invsqrt2));
+}
+
+constexpr double snpdf(const double x) {
+    return invsqrt2pi * exp(-(x * x) * 0.5);
+}
+
 double read_double(const char* label) {
     while (true) {
         cout << label;
@@ -54,11 +68,6 @@ tm read_date(const char* label) {
     }
 }
 
-double phi(double x) {
-    constexpr double one_over_sqrt2 = 0.7071067811865476;
-    return (1 + erf(x * one_over_sqrt2)) * 0.5;
-}
-
 BlackScholesMerton::BlackScholesMerton() {
     constexpr double years_per_second = 3.1709791983764586E-8;
 
@@ -67,20 +76,63 @@ BlackScholesMerton::BlackScholesMerton() {
     v = read_double("Volatility %: ") / 100;
     r = read_double("Risk-free interest rate %: ") / 100;
     q = read_double("Dividend yield %: ") / 100;
+    
     tm expdate = read_date("Expiration date (mm/dd/yyyy): ");
-    const double days = (mktime(&expdate) - time(nullptr)) / (double)86400;
-    cout << "Days: " << days << endl;
     t = (mktime(&expdate) - time(nullptr)) * years_per_second;
+
+    v_sqrt_t = v * sqrt(t);
+    d1 = (log(S / K) + t * (r - q + v * v * 0.5)) / v_sqrt_t;
+    d2 = d1 - v_sqrt_t;
 }
 
 double BlackScholesMerton::call_price() const {
-    const D1D2 d = calc_d1d2();
-    return S * exp(-q * t) * phi(d.d1) - K * exp(-r * t) * phi(d.d2);
+    return S * exp(-q * t) * sncdf(d1) - K * exp(-r * t) * sncdf(d2);
 }
 
 double BlackScholesMerton::put_price() const {
-    const D1D2 d = calc_d1d2();
-    return K * exp(-r * t) * phi(-d.d2) - S * exp(-q * t) * phi(-d.d1);
+    return K * exp(-r * t) * sncdf(-d2) - S * exp(-q * t) * sncdf(-d1);
+}
+
+double BlackScholesMerton::delta_call() const {
+    return exp(-q * t) * sncdf(d1);
+}
+
+double BlackScholesMerton::delta_put() const {
+    return exp(-q * t) * (sncdf(d1) - 1);
+}
+
+double BlackScholesMerton::gamma() const {
+    return exp(-q * t) / (S * v_sqrt_t) * snpdf(d1);
+}
+
+double BlackScholesMerton::theta_call() const {
+    return years_per_day * (
+        theta_base() - r * K * exp(-r * t) * sncdf(d2) +
+            q * S * exp(-q * t) * sncdf(d1)
+    );
+}
+
+double BlackScholesMerton::theta_put() const {
+    return years_per_day * (
+        theta_base() + r * K * exp(-r * t) * sncdf(-d2) -
+            q * S * exp(-q * t) * sncdf(-d1)
+    );
+}
+
+double BlackScholesMerton::vega() const {
+    return 0.01 * S * exp(-q * t) * sqrt(t) * snpdf(d1);
+}
+
+double BlackScholesMerton::rho_call() const {
+    return 0.01 * K * t * exp(-r * t) * sncdf(d2);
+}
+
+double BlackScholesMerton::rho_put() const {
+    return -0.01 * K * t * exp(-r * t) * sncdf(-d2);
+}
+
+double BlackScholesMerton::theta_base() const {
+    return -(S * v * exp(-q * t) / (2 * sqrt(t)) * snpdf(d1));
 }
 
 ostream& operator<<(ostream& out, const BlackScholesMerton& b) {
@@ -92,12 +144,4 @@ ostream& operator<<(ostream& out, const BlackScholesMerton& b) {
         "\nDays to expiration: " << b.t * 365;
     
     return out;
-}
-
-BlackScholesMerton::D1D2 BlackScholesMerton::calc_d1d2() const {
-    const double v_times_sqrt_t = v * sqrt(t);
-    D1D2 res;
-    res.d1 = (log(S / K) + t * (r - q + v * v * 0.5)) / v_times_sqrt_t;
-    res.d2 = res.d1 - v_times_sqrt_t;
-    return res;
 }
