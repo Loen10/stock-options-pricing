@@ -2,8 +2,6 @@
 #include <iostream>
 #include <string>
 
-using namespace std;
-
 class BlackScholesMerton {
 public:
     BlackScholesMerton();
@@ -19,7 +17,9 @@ public:
     double rho_call() const;
     double rho_put() const;
 
-    friend ostream& operator<<(ostream& out, const BlackScholesMerton& b);
+    friend std::ostream& operator<<(
+        std::ostream& out,
+        const BlackScholesMerton& b);
 private:
     double S, K, v, r, q, t, v_sqrt_t, d1, d2;
 
